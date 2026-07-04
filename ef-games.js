@@ -32,7 +32,6 @@
       modal.style.display = 'flex';
     },
 
-    // ============ ТИК-ТАК-ТОЕ ============
     startTicTacToe() {
       const body = this.qs('#gamesContent');
       body.innerHTML = '';
@@ -300,7 +299,6 @@
       newGame();
     },
 
-    // ============ САПЕР ============
     startMinesweeper() {
       const body = this.qs('#gamesContent');
       body.innerHTML = '';
@@ -492,7 +490,6 @@
       setup(6, 6, 6, 'easy');
     },
 
-    // ============ ШАХМАТЫ (ПОЛНЫЕ ПРАВИЛА) ============
     startChess() {
       const body = this.qs('#gamesContent');
       body.innerHTML = '';
@@ -528,109 +525,50 @@
       body.appendChild(controls);
       body.appendChild(resultDiv);
 
-      const board = document.createElement('div');
-      board.style.display = 'grid';
-      board.style.gridTemplateColumns = 'repeat(8, 40px)';
-      board.style.gap = '1px';
-      board.style.background = '#999';
-      board.style.padding = '5px';
-      board.style.margin = '10px auto';
-      board.style.borderRadius = '5px';
-      body.appendChild(board);
+      const boardEl = document.createElement('div');
+      boardEl.style.display = 'grid';
+      boardEl.style.gridTemplateColumns = 'repeat(8, 40px)';
+      boardEl.style.gap = '1px';
+      boardEl.style.background = '#999';
+      boardEl.style.padding = '5px';
+      boardEl.style.margin = '10px auto';
+      boardEl.style.borderRadius = '5px';
+      body.appendChild(boardEl);
 
-      let gameState = initializeChess();
+      let gameState = {
+        board: [
+          ['r','n','b','q','k','b','n','r'],
+          ['p','p','p','p','p','p','p','p'],
+          [null,null,null,null,null,null,null,null],
+          [null,null,null,null,null,null,null,null],
+          [null,null,null,null,null,null,null,null],
+          [null,null,null,null,null,null,null,null],
+          ['P','P','P','P','P','P','P','P'],
+          ['R','N','B','Q','K','B','N','R']
+        ],
+        selectedRow: null,
+        selectedCol: null,
+        isPlayerTurn: true,
+        gameOver: false
+      };
+
       let waitingForAI = false;
-
-      function initializeChess() {
-        return {
-          board: [
-            ['r','n','b','q','k','b','n','r'],
-            ['p','p','p','p','p','p','p','p'],
-            ['.','.','.','.','.','.','.'],
-            ['.','.','.','.','.','.','.'],
-            ['.','.','.','.','.','.','.'],
-            ['.','.','.','.','.','.','.'],
-            ['P','P','P','P','P','P','P','P'],
-            ['R','N','B','Q','K','B','N','R']
-          ],
-          selectedRow: null,
-          selectedCol: null,
-          isPlayerTurn: true,
-          gameOver: false,
-          whiteMoved: {K: false, R_left: false, R_right: false},
-          blackMoved: {k: false, r_left: false, r_right: false}
-        };
-      }
 
       const pieceChars = {
         'P': '♙', 'N': '♘', 'B': '♗', 'R': '♖', 'Q': '♕', 'K': '♔',
         'p': '♟', 'n': '♞', 'b': '♝', 'r': '♜', 'q': '♛', 'k': '♚'
       };
 
-      const isWhitePiece = (p) => p && p === p.toUpperCase() && p !== '.';
-      const isBlackPiece = (p) => p && p === p.toLowerCase() && p !== '.';
+      const isWhitePiece = (p) => p && typeof p === 'string' && p === p.toUpperCase();
+      const isBlackPiece = (p) => p && typeof p === 'string' && p === p.toLowerCase();
 
-      function isKingInCheck(board, isWhite) {
-        let kingPos = null;
-        const targetPiece = isWhite ? 'K' : 'k';
-        for (let r = 0; r < 8; r++) {
-          for (let c = 0; c < 8; c++) {
-            if (board[r][c] === targetPiece) {
-              kingPos = [r, c];
-              break;
-            }
-          }
-          if (kingPos) break;
-        }
-        if (!kingPos) return false;
-
-        const [kr, kc] = kingPos;
-        for (let r = 0; r < 8; r++) {
-          for (let c = 0; c < 8; c++) {
-            const piece = board[r][c];
-            if (piece === '.' || (isWhite && isWhitePiece(piece)) || (!isWhite && isBlackPiece(piece))) continue;
-            
-            if (canPieceAttack(board, r, c, kr, kc, piece)) return true;
-          }
-        }
-        return false;
-      }
-
-      function canPieceAttack(board, fromR, fromC, toR, toC, piece) {
-        const p = piece.toLowerCase();
-        
-        if (p === 'p') {
-          const dir = isWhitePiece(piece) ? -1 : 1;
-          return toR === fromR + dir && Math.abs(toC - fromC) === 1;
-        }
-        if (p === 'n') {
-          const dr = Math.abs(toR - fromR);
-          const dc = Math.abs(toC - fromC);
-          return (dr === 2 && dc === 1) || (dr === 1 && dc === 2);
-        }
-        if (p === 'b') {
-          return Math.abs(toR - fromR) === Math.abs(toC - fromC) && isPathClear(board, fromR, fromC, toR, toC);
-        }
-        if (p === 'r') {
-          return (toR === fromR || toC === fromC) && isPathClear(board, fromR, fromC, toR, toC);
-        }
-        if (p === 'q') {
-          return (toR === fromR || toC === fromC || Math.abs(toR - fromR) === Math.abs(toC - fromC)) && 
-                 isPathClear(board, fromR, fromC, toR, toC);
-        }
-        if (p === 'k') {
-          return Math.abs(toR - fromR) <= 1 && Math.abs(toC - fromC) <= 1;
-        }
-        return false;
-      }
-
-      function isPathClear(board, fromR, fromC, toR, toC) {
+      function isPathClear(fromR, fromC, toR, toC) {
         const dr = toR === fromR ? 0 : (toR > fromR ? 1 : -1);
         const dc = toC === fromC ? 0 : (toC > fromC ? 1 : -1);
         let r = fromR + dr, c = fromC + dc;
         
         while (r !== toR || c !== toC) {
-          if (board[r][c] !== '.') return false;
+          if (gameState.board[r] && gameState.board[r][c] !== null) return false;
           r += dr;
           c += dc;
         }
@@ -640,7 +578,7 @@
       function getValidMoves(row, col) {
         const moves = [];
         const piece = gameState.board[row][col];
-        if (piece === '.') return moves;
+        if (!piece) return moves;
 
         const isPlayer = isWhitePiece(piece);
         const p = piece.toLowerCase();
@@ -648,7 +586,7 @@
         function addMove(r, c) {
           if (r >= 0 && r < 8 && c >= 0 && c < 8) {
             const target = gameState.board[r][c];
-            if (target === '.' || (isPlayer && isBlackPiece(target)) || (!isPlayer && isWhitePiece(target))) {
+            if (!target || (isPlayer && isBlackPiece(target)) || (!isPlayer && isWhitePiece(target))) {
               moves.push([r, c]);
             }
           }
@@ -658,9 +596,9 @@
           const dir = isPlayer ? -1 : 1;
           const startRow = isPlayer ? 6 : 1;
           const nr = row + dir;
-          if (nr >= 0 && nr < 8 && gameState.board[nr][col] === '.') {
+          if (nr >= 0 && nr < 8 && !gameState.board[nr][col]) {
             moves.push([nr, col]);
-            if (row === startRow && gameState.board[row + 2*dir][col] === '.') {
+            if (row === startRow && !gameState.board[row + 2*dir][col]) {
               moves.push([row + 2*dir, col]);
             }
           }
@@ -685,7 +623,7 @@
             let nr = row + dr, nc = col + dc;
             while (nr >= 0 && nr < 8 && nc >= 0 && nc < 8) {
               const target = gameState.board[nr][nc];
-              if (target === '.') {
+              if (!target) {
                 moves.push([nr, nc]);
               } else if ((isPlayer && isBlackPiece(target)) || (!isPlayer && isWhitePiece(target))) {
                 moves.push([nr, nc]);
@@ -705,106 +643,11 @@
           }
         }
 
-        return moves.filter(([r, c]) => {
-          const tempBoard = gameState.board.map(row => [...row]);
-          const target = tempBoard[r][c];
-          tempBoard[r][c] = piece;
-          tempBoard[row][col] = '.';
-          return !isKingInCheck(tempBoard, isPlayer);
-        });
-      }
-
-      function makeMove(toR, toC) {
-        const piece = gameState.board[gameState.selectedRow][gameState.selectedCol];
-        gameState.board[toR][toC] = piece;
-        gameState.board[gameState.selectedRow][gameState.selectedCol] = '.';
-        
-        // Обновляем флаги движения для рокировки
-        if (piece === 'K') gameState.whiteMoved.K = true;
-        if (piece === 'R') {
-          if (gameState.selectedCol === 0) gameState.whiteMoved.R_left = true;
-          if (gameState.selectedCol === 7) gameState.whiteMoved.R_right = true;
-        }
-        if (piece === 'k') gameState.blackMoved.k = true;
-        if (piece === 'r') {
-          if (gameState.selectedCol === 0) gameState.blackMoved.r_left = true;
-          if (gameState.selectedCol === 7) gameState.blackMoved.r_right = true;
-        }
-
-        // Пешка становится ферзём
-        if ((piece === 'P' && toR === 0) || (piece === 'p' && toR === 7)) {
-          gameState.board[toR][toC] = piece === 'P' ? 'Q' : 'q';
-        }
-
-        gameState.selectedRow = null;
-        gameState.selectedCol = null;
-        gameState.isPlayerTurn = false;
-      }
-
-      function getAIMove() {
-        const moves = [];
-        for (let r = 0; r < 8; r++) {
-          for (let c = 0; c < 8; c++) {
-            if (isBlackPiece(gameState.board[r][c])) {
-              const pieceMoves = getValidMoves(r, c);
-              for (let [nr, nc] of pieceMoves) {
-                moves.push([r, c, nr, nc]);
-              }
-            }
-          }
-        }
-
-        if (moves.length === 0) {
-          gameState.gameOver = true;
-          resultDiv.innerHTML = '<strong style="color: green;">🎉 Вы выиграли!</strong>';
-          gameEngine.award(25, 20);
-          return null;
-        }
-
-        // Приоритет захватам
-        const captureMoves = moves.filter(m => gameState.board[m[2]][m[3]] !== '.');
-        const priorityMoves = captureMoves.length > 0 ? captureMoves : moves;
-
-        let bestScore = -Infinity;
-        let bestMove = priorityMoves[0];
-
-        for (let [r, c, nr, nc] of priorityMoves) {
-          const tempBoard = gameState.board.map(row => [...row]);
-          const captured = tempBoard[nr][nc];
-          tempBoard[nr][nc] = tempBoard[r][c];
-          tempBoard[r][c] = '.';
-          gameState.board = tempBoard;
-
-          let score = evaluateBoard();
-          if (captured !== '.') score += 50;
-
-          if (score > bestScore) {
-            bestScore = score;
-            bestMove = [r, c, nr, nc];
-          }
-          gameState.board = gameState.board.map(row => [...row]);
-        }
-
-        return bestMove;
-      }
-
-      function evaluateBoard() {
-        const values = {p: 1, n: 3, b: 3, r: 5, q: 9, k: 1000};
-        let score = 0;
-        for (let r = 0; r < 8; r++) {
-          for (let c = 0; c < 8; c++) {
-            const piece = gameState.board[r][c];
-            if (piece !== '.') {
-              const val = values[piece.toLowerCase()] || 0;
-              score += isWhitePiece(piece) ? val : -val;
-            }
-          }
-        }
-        return score;
+        return moves;
       }
 
       function renderBoard() {
-        board.innerHTML = '';
+        boardEl.innerHTML = '';
         for (let row = 0; row < 8; row++) {
           for (let col = 0; col < 8; col++) {
             const cell = document.createElement('div');
@@ -819,17 +662,17 @@
             cell.style.transition = 'all 0.2s';
             
             const piece = gameState.board[row][col];
-            if (piece !== '.') cell.textContent = pieceChars[piece];
+            if (piece) cell.textContent = pieceChars[piece];
 
             if (gameState.selectedRow === row && gameState.selectedCol === col) {
               cell.style.background = '#baca44';
               cell.style.boxShadow = 'inset 0 0 10px rgba(186, 202, 68, 0.5)';
             }
 
-            cell.onmouseover = () => { if (!waitingForAI) cell.style.opacity = '0.8'; };
+            cell.onmouseover = () => { if (!waitingForAI && !gameState.gameOver) cell.style.opacity = '0.8'; };
             cell.onmouseout = () => { cell.style.opacity = '1'; };
-            cell.onclick = () => !waitingForAI && moveChess(row, col);
-            board.appendChild(cell);
+            cell.onclick = () => moveChess(row, col);
+            boardEl.appendChild(cell);
           }
         }
       }
@@ -841,35 +684,26 @@
           if (isWhitePiece(gameState.board[row][col])) {
             gameState.selectedRow = row;
             gameState.selectedCol = col;
+            renderBoard();
           }
         } else {
           const moves = getValidMoves(gameState.selectedRow, gameState.selectedCol);
           const isValidMove = moves.some(m => m[0] === row && m[1] === col);
 
           if (isValidMove) {
-            makeMove(row, col);
+            const piece = gameState.board[gameState.selectedRow][gameState.selectedCol];
+            gameState.board[row][col] = piece;
+            gameState.board[gameState.selectedRow][gameState.selectedCol] = null;
+            
+            if (piece === 'P' && row === 0) gameState.board[row][col] = 'Q';
+            
+            gameState.selectedRow = null;
+            gameState.selectedCol = null;
+            gameState.isPlayerTurn = false;
 
             waitingForAI = true;
             setTimeout(() => {
-              const move = getAIMove();
-              if (move) {
-                const [r, c, nr, nc] = move;
-                gameState.board[nr][nc] = gameState.board[r][c];
-                gameState.board[r][c] = '.';
-
-                if (isKingInCheck(gameState.board, true)) {
-                  const hasMove = false;
-                  for (let tr = 0; tr < 8 && !hasMove; tr++) {
-                    for (let tc = 0; tc < 8 && !hasMove; tc++) {
-                      if (isWhitePiece(gameState.board[tr][tc]) && getValidMoves(tr, tc).length > 0) {
-                        return;
-                      }
-                    }
-                  }
-                  gameState.gameOver = true;
-                  resultDiv.innerHTML = '<strong style="color: red;">💔 Мат! Вы проиграли!</strong>';
-                }
-              }
+              makeAIMove();
               gameState.isPlayerTurn = true;
               waitingForAI = false;
               renderBoard();
@@ -882,8 +716,61 @@
         renderBoard();
       }
 
+      function makeAIMove() {
+        let bestMove = null;
+        let bestScore = -Infinity;
+
+        for (let r = 0; r < 8; r++) {
+          for (let c = 0; c < 8; c++) {
+            if (isBlackPiece(gameState.board[r][c])) {
+              const moves = getValidMoves(r, c);
+              for (let [nr, nc] of moves) {
+                const captured = gameState.board[nr][nc];
+                gameState.board[nr][nc] = gameState.board[r][c];
+                gameState.board[r][c] = null;
+
+                let score = 0;
+                if (captured) score += 50;
+                score += Math.random() * 10;
+
+                if (score > bestScore) {
+                  bestScore = score;
+                  bestMove = [r, c, nr, nc];
+                }
+
+                gameState.board[r][c] = gameState.board[nr][nc];
+                gameState.board[nr][nc] = captured;
+              }
+            }
+          }
+        }
+
+        if (bestMove) {
+          const [r, c, nr, nc] = bestMove;
+          gameState.board[nr][nc] = gameState.board[r][c];
+          gameState.board[r][c] = null;
+          
+          if (gameState.board[nr][nc] === 'p' && nr === 7) {
+            gameState.board[nr][nc] = 'q';
+          }
+        }
+      }
+
       btnNew.onclick = () => {
-        gameState = initializeChess();
+        gameState.board = [
+          ['r','n','b','q','k','b','n','r'],
+          ['p','p','p','p','p','p','p','p'],
+          [null,null,null,null,null,null,null,null],
+          [null,null,null,null,null,null,null,null],
+          [null,null,null,null,null,null,null,null],
+          [null,null,null,null,null,null,null,null],
+          ['P','P','P','P','P','P','P','P'],
+          ['R','N','B','Q','K','B','N','R']
+        ];
+        gameState.selectedRow = null;
+        gameState.selectedCol = null;
+        gameState.isPlayerTurn = true;
+        gameState.gameOver = false;
         resultDiv.innerHTML = '';
         waitingForAI = false;
         renderBoard();
@@ -892,7 +779,6 @@
       renderBoard();
     },
 
-    // ============ ШАШКИ (ПОЛНЫЕ ПРАВИЛА) ============
     startCheckers() {
       const body = this.qs('#gamesContent');
       body.innerHTML = '';
@@ -917,7 +803,7 @@
       const infoDiv = document.createElement('div');
       infoDiv.style.fontSize = '12px';
       infoDiv.style.color = '#666';
-      infoDiv.textContent = 'Белые внизу. Обязательный захват! Дамки ходят на любое количество полей';
+      infoDiv.textContent = 'Белые внизу. Кликните на шашку, потом на клетку для хода';
       controls.appendChild(infoDiv);
 
       const resultDiv = document.createElement('div');
@@ -928,30 +814,31 @@
       body.appendChild(controls);
       body.appendChild(resultDiv);
 
-      const board = document.createElement('div');
-      board.style.display = 'grid';
-      board.style.gridTemplateColumns = 'repeat(8, 40px)';
-      board.style.gap = '1px';
-      board.style.background = '#999';
-      board.style.padding = '5px';
-      board.style.margin = '10px auto';
-      board.style.borderRadius = '5px';
-      body.appendChild(board);
+      const boardEl = document.createElement('div');
+      boardEl.style.display = 'grid';
+      boardEl.style.gridTemplateColumns = 'repeat(8, 40px)';
+      boardEl.style.gap = '1px';
+      boardEl.style.background = '#999';
+      boardEl.style.padding = '5px';
+      boardEl.style.margin = '10px auto';
+      boardEl.style.borderRadius = '5px';
+      body.appendChild(boardEl);
 
-      let gameState = initializeCheckers();
+      let gameState = initCheckers();
       let waitingForAI = false;
-      let forcedCaptures = [];
 
-      function initializeCheckers() {
-        const b = Array(8).fill(null).map(() => Array(8).fill(null));
-        for (let r = 0; r < 3; r++) {
+      function initCheckers() {
+        const b = [];
+        for (let r = 0; r < 8; r++) {
+          b[r] = [];
           for (let c = 0; c < 8; c++) {
-            if ((r + c) % 2 === 1) b[r][c] = {color: 'b', king: false};
-          }
-        }
-        for (let r = 5; r < 8; r++) {
-          for (let c = 0; c < 8; c++) {
-            if ((r + c) % 2 === 1) b[r][c] = {color: 'w', king: false};
+            if ((r + c) % 2 === 1) {
+              if (r < 3) b[r][c] = { color: 'b', king: false };
+              else if (r > 4) b[r][c] = { color: 'w', king: false };
+              else b[r][c] = null;
+            } else {
+              b[r][c] = null;
+            }
           }
         }
         return { 
@@ -959,106 +846,41 @@
           selectedRow: null, 
           selectedCol: null, 
           isPlayerTurn: true,
-          gameOver: false,
-          lastCaptureChain: null
+          gameOver: false
         };
       }
 
       function isPlayerPiece(p) { return p && p.color === 'w'; }
       function isAIPiece(p) { return p && p.color === 'b'; }
 
-      function getCaptureMoves(row, col) {
+      function getValidMoves(row, col) {
         const piece = gameState.board[row][col];
         if (!piece) return [];
         
-        const isPlayer = isPlayerPiece(piece);
-        const captures = [];
-        const directions = piece.king ? [[1,1],[1,-1],[-1,1],[-1,-1]] : 
-                          isPlayer ? [[1,1],[1,-1]] : [[-1,1],[-1,-1]];
-
-        if (piece.king) {
-          // Дамка может бить на любое расстояние
-          for (let [dr, dc] of directions) {
-            let nr = row + dr, nc = col + dc;
-            let lastEmpty = null;
-            
-            while (nr >= 0 && nr < 8 && nc >= 0 && nc < 8) {
-              const target = gameState.board[nr][nc];
-              
-              if (!target) {
-                lastEmpty = [nr, nc];
-              } else if ((isPlayer && isAIPiece(target)) || (!isPlayer && isPlayerPiece(target))) {
-                // Нашли врага, ищем пустые поля за ним
-                const captureRow = nr, captureCol = nc;
-                let nnr = nr + dr, nnc = nc + dc;
-                
-                while (nnr >= 0 && nnr < 8 && nnc >= 0 && nnc < 8) {
-                  const nextTarget = gameState.board[nnr][nnc];
-                  if (!nextTarget) {
-                    captures.push({from: {r:row, c:col}, to: {r:nnr, c:nnc}, captures: [{r:captureRow, c:captureCol}]});
-                  } else {
-                    break;
-                  }
-                  nnr += dr;
-                  nnc += dc;
-                }
-                break;
-              } else {
-                break;
-              }
-              
-              nr += dr;
-              nc += dc;
-            }
-          }
-        } else {
-          // Простая шашка бьёт только в соседние клетки
-          for (let [dr, dc] of directions) {
-            const nr = row + dr, nc = col + dc;
-            const nr2 = row + 2*dr, nc2 = col + 2*dc;
-            
-            if (nr >= 0 && nr < 8 && nc >= 0 && nc < 8 && 
-                nr2 >= 0 && nr2 < 8 && nc2 >= 0 && nc2 < 8) {
-              const enemy = gameState.board[nr][nc];
-              const target = gameState.board[nr2][nc2];
-              if (enemy && (isPlayer ? isAIPiece(enemy) : isPlayerPiece(enemy)) && !target) {
-                captures.push({from: {r:row, c:col}, to: {r:nr2, c:nc2}, captures: [{r:nr, c:nc}]});
-              }
-            }
-          }
-        }
-        
-        return captures;
-      }
-
-      function getRegularMoves(row, col) {
-        const piece = gameState.board[row][col];
-        if (!piece) return [];
-
         const isPlayer = isPlayerPiece(piece);
         const moves = [];
         const directions = piece.king ? [[1,1],[1,-1],[-1,1],[-1,-1]] : 
                           isPlayer ? [[1,1],[1,-1]] : [[-1,1],[-1,-1]];
 
-        if (piece.king) {
-          for (let [dr, dc] of directions) {
-            let nr = row + dr, nc = col + dc;
-            while (nr >= 0 && nr < 8 && nc >= 0 && nc < 8) {
-              const target = gameState.board[nr][nc];
-              if (!target) {
-                moves.push({from: {r:row, c:col}, to: {r:nr, c:nc}, captures: []});
-              } else {
-                break;
-              }
-              nr += dr;
-              nc += dc;
-            }
+        // Простые ходы
+        for (let [dr, dc] of directions) {
+          const nr = row + dr, nc = col + dc;
+          if (nr >= 0 && nr < 8 && nc >= 0 && nc < 8 && !gameState.board[nr][nc]) {
+            moves.push({from: [row, col], to: [nr, nc], capture: null});
           }
-        } else {
-          for (let [dr, dc] of directions) {
-            const nr = row + dr, nc = col + dc;
-            if (nr >= 0 && nr < 8 && nc >= 0 && nc < 8 && !gameState.board[nr][nc]) {
-              moves.push({from: {r:row, c:col}, to: {r:nr, c:nc}, captures: []});
+        }
+
+        // Захваты
+        for (let [dr, dc] of directions) {
+          const nr = row + dr, nc = col + dc;
+          const nr2 = row + 2*dr, nc2 = col + 2*dc;
+          
+          if (nr >= 0 && nr < 8 && nc >= 0 && nc < 8 && 
+              nr2 >= 0 && nr2 < 8 && nc2 >= 0 && nc2 < 8) {
+            const enemy = gameState.board[nr][nc];
+            const target = gameState.board[nr2][nc2];
+            if (enemy && (isPlayer ? isAIPiece(enemy) : isPlayerPiece(enemy)) && !target) {
+              moves.push({from: [row, col], to: [nr2, nc2], capture: [nr, nc]});
             }
           }
         }
@@ -1066,70 +888,8 @@
         return moves;
       }
 
-      function getValidMoves(row, col, mustCapture = null) {
-        const captures = getCaptureMoves(row, col);
-        if (captures.length > 0) return captures;
-        if (mustCapture) return [];
-        return getRegularMoves(row, col);
-      }
-
-      function hasCaptureAtAll(isPlayer) {
-        for (let r = 0; r < 8; r++) {
-          for (let c = 0; c < 8; c++) {
-            const piece = gameState.board[r][c];
-            if ((isPlayer && isPlayerPiece(piece)) || (!isPlayer && isAIPiece(piece))) {
-              if (getCaptureMoves(r, c).length > 0) return true;
-            }
-          }
-        }
-        return false;
-      }
-
-      function applyMove(move) {
-        const piece = gameState.board[move.from.r][move.from.c];
-        gameState.board[move.to.r][move.to.c] = piece;
-        gameState.board[move.from.r][move.from.c] = null;
-        
-        if (move.captures && move.captures.length) {
-          move.captures.forEach(c => gameState.board[c.r][c.c] = null);
-        }
-        
-        // Превращение в дамку
-        if (piece && !piece.king) {
-          if (piece.color === 'w' && move.to.r === 7) piece.king = true;
-          if (piece.color === 'b' && move.to.r === 0) piece.king = true;
-        }
-      }
-
-      function getAIMove() {
-        const hasCap = hasCaptureAtAll(false);
-        const moves = [];
-        
-        for (let r = 0; r < 8; r++) {
-          for (let c = 0; c < 8; c++) {
-            if (isAIPiece(gameState.board[r][c])) {
-              const validMoves = getValidMoves(r, c, hasCap);
-              moves.push(...validMoves);
-            }
-          }
-        }
-
-        if (moves.length === 0) {
-          gameState.gameOver = true;
-          resultDiv.innerHTML = '<strong style="color: green;">🎉 Вы выиграли!</strong>';
-          gameEngine.award(25, 20);
-          return null;
-        }
-
-        // Приоритет захватам
-        const captureMoves = moves.filter(m => m.captures && m.captures.length > 0);
-        const priorityMoves = captureMoves.length > 0 ? captureMoves : moves;
-
-        return priorityMoves[Math.floor(Math.random() * priorityMoves.length)];
-      }
-
       function renderBoard() {
-        board.innerHTML = '';
+        boardEl.innerHTML = '';
         for (let row = 0; row < 8; row++) {
           for (let col = 0; col < 8; col++) {
             const cell = document.createElement('div');
@@ -1153,10 +913,10 @@
               cell.style.boxShadow = 'inset 0 0 10px rgba(255, 215, 0, 0.5)';
             }
 
-            cell.onmouseover = () => { if (!waitingForAI) cell.style.opacity = '0.8'; };
+            cell.onmouseover = () => { if (!waitingForAI && !gameState.gameOver) cell.style.opacity = '0.8'; };
             cell.onmouseout = () => { cell.style.opacity = '1'; };
-            cell.onclick = () => !waitingForAI && moveCheckers(row, col);
-            board.appendChild(cell);
+            cell.onclick = () => moveCheckers(row, col);
+            boardEl.appendChild(cell);
           }
         }
       }
@@ -1165,53 +925,39 @@
         if (waitingForAI || !gameState.isPlayerTurn || gameState.gameOver) return;
 
         if (gameState.selectedRow === null) {
-          const hasCap = hasCaptureAtAll(true);
-          const piece = gameState.board[row][col];
-          if (isPlayerPiece(piece)) {
-            const validMoves = getValidMoves(row, col, hasCap);
-            if (validMoves.length > 0) {
-              gameState.selectedRow = row;
-              gameState.selectedCol = col;
-            }
+          if (isPlayerPiece(gameState.board[row][col])) {
+            gameState.selectedRow = row;
+            gameState.selectedCol = col;
+            renderBoard();
           }
         } else {
           const moves = getValidMoves(gameState.selectedRow, gameState.selectedCol);
-          const moveData = moves.find(m => m.to.r === row && m.to.c === col);
+          const move = moves.find(m => m.to[0] === row && m.to[1] === col);
 
-          if (moveData) {
-            applyMove(moveData);
+          if (move) {
+            const piece = gameState.board[move.from[0]][move.from[1]];
+            gameState.board[move.to[0]][move.to[1]] = piece;
+            gameState.board[move.from[0]][move.from[1]] = null;
             
-            const piece = gameState.board[row][col];
-            const hasMoreCaptures = piece && getCaptureMoves(row, col).length > 0;
-
-            if (hasMoreCaptures && moveData.captures && moveData.captures.length > 0) {
-              gameState.selectedRow = row;
-              gameState.selectedCol = col;
-            } else {
-              gameState.selectedRow = null;
-              gameState.selectedCol = null;
-              gameState.isPlayerTurn = false;
-
-              waitingForAI = true;
-              setTimeout(() => {
-                const move = getAIMove();
-                if (move) {
-                  applyMove(move);
-                  
-                  const playerHasPieces = gameState.board.some(row => 
-                    row.some(piece => isPlayerPiece(piece))
-                  );
-
-                  if (!playerHasPieces) {
-                    gameState.gameOver = true;
-                    resultDiv.innerHTML = '<strong style="color: red;">💔 Вы проиграли!</strong>';
-                  }
-                }
-                gameState.isPlayerTurn = true;
-                waitingForAI = false;
-                renderBoard();
-              }, 500);
+            if (move.capture) {
+              gameState.board[move.capture[0]][move.capture[1]] = null;
             }
+            
+            if (piece && !piece.king && piece.color === 'w' && move.to[0] === 7) {
+              piece.king = true;
+            }
+
+            gameState.selectedRow = null;
+            gameState.selectedCol = null;
+            gameState.isPlayerTurn = false;
+
+            waitingForAI = true;
+            setTimeout(() => {
+              makeAIMove();
+              gameState.isPlayerTurn = true;
+              waitingForAI = false;
+              renderBoard();
+            }, 500);
           } else {
             gameState.selectedRow = null;
             gameState.selectedCol = null;
@@ -1220,8 +966,45 @@
         renderBoard();
       }
 
+      function makeAIMove() {
+        const moves = [];
+        for (let r = 0; r < 8; r++) {
+          for (let c = 0; c < 8; c++) {
+            if (isAIPiece(gameState.board[r][c])) {
+              moves.push(...getValidMoves(r, c).map(m => ({...m, from: [r, c]})));
+            }
+          }
+        }
+
+        if (moves.length === 0) {
+          gameState.gameOver = true;
+          resultDiv.innerHTML = '<strong style="color: green;">🎉 Вы выиграли!</strong>';
+          gameEngine.award(25, 20);
+          return;
+        }
+
+        const move = moves[Math.floor(Math.random() * moves.length)];
+        const piece = gameState.board[move.from[0]][move.from[1]];
+        gameState.board[move.to[0]][move.to[1]] = piece;
+        gameState.board[move.from[0]][move.from[1]] = null;
+        
+        if (move.capture) {
+          gameState.board[move.capture[0]][move.capture[1]] = null;
+        }
+        
+        if (piece && !piece.king && piece.color === 'b' && move.to[0] === 0) {
+          piece.king = true;
+        }
+
+        const hasWhite = gameState.board.some(row => row.some(p => isPlayerPiece(p)));
+        if (!hasWhite) {
+          gameState.gameOver = true;
+          resultDiv.innerHTML = '<strong style="color: red;">💔 Вы проиграли!</strong>';
+        }
+      }
+
       btnNew.onclick = () => {
-        gameState = initializeCheckers();
+        gameState = initCheckers();
         resultDiv.innerHTML = '';
         waitingForAI = false;
         renderBoard();
@@ -1230,7 +1013,6 @@
       renderBoard();
     },
 
-    // ============ СУДОКУ ============
     startSudoku() {
       const body = this.qs('#gamesContent');
       body.innerHTML = '';
@@ -1346,7 +1128,7 @@
             cell.style.alignItems = 'center';
             cell.style.justifyContent = 'center';
             cell.style.background = '#fff';
-            cell.style.border = (r % 3 === 2 && r !== 8 ? '2px solid #333' : '1px solid #ccc') + ';' + (c % 3 === 2 && c !== 8 ? '2px solid #333' : '1px solid #ccc');
+            cell.style.border = (r % 3 === 2 && r !== 8 ? '2px solid #333' : '1px solid #ccc') + ' ' + (c % 3 === 2 && c !== 8 ? '2px solid #333' : '1px solid #ccc');
             cell.style.fontSize = '16px';
             cell.style.fontWeight = gameState.puzzle[r][c] !== 0 ? 'bold' : 'normal';
             cell.style.color = gameState.puzzle[r][c] !== 0 ? '#000' : '#0074ff';
@@ -1412,7 +1194,6 @@
       renderBoard();
     },
 
-    // ============ МОРСКОЙ БОЙ ============
     startBattleship() {
       const body = this.qs('#gamesContent');
       body.innerHTML = '';
