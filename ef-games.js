@@ -736,10 +736,14 @@
           return moves[Math.floor(Math.random() * moves.length)];
         }
 
+        // Приоритизируем ходы с захватом фигур
+        const captureMoves = moves.filter(m => gameState.board[m[2]][m[3]] !== null);
+        const priorityMoves = captureMoves.length > 0 ? captureMoves : moves;
+
         let bestScore = -Infinity;
         let bestMoves = [];
 
-        for (let [r, c, nr, nc] of moves) {
+        for (let [r, c, nr, nc] of priorityMoves) {
           const captured = gameState.board[nr][nc];
           gameState.board[nr][nc] = gameState.board[r][c];
           gameState.board[r][c] = null;
@@ -944,12 +948,12 @@
         const b = Array(8).fill(null).map(() => Array(8).fill(null));
         for (let r = 0; r < 3; r++) {
           for (let c = 0; c < 8; c++) {
-            if ((r + c) % 2 === 1) b[r][c] = '⚫';
+            if ((r + c) % 2 === 1) b[r][c] = {color: 'b', king: false};
           }
         }
         for (let r = 5; r < 8; r++) {
           for (let c = 0; c < 8; c++) {
-            if ((r + c) % 2 === 1) b[r][c] = '⚪';
+            if ((r + c) % 2 === 1) b[r][c] = {color: 'w', king: false};
           }
         }
         return { 
@@ -958,18 +962,16 @@
           selectedCol: null, 
           moves: 0,
           isPlayerTurn: true,
-          gameOver: false,
-          playerDames: {},
-          aiDames: {}
+          gameOver: false
         };
       }
 
       function isPlayerPiece(piece) {
-        return piece === '⚪' || (piece && piece.includes('⚪'));
+        return piece && piece.color === 'w';
       }
 
       function isAIPiece(piece) {
-        return piece === '⚫' || (piece && piece.includes('⚫'));
+        return piece && piece.color === 'b';
       }
 
       function getValidMoves(row, col) {
@@ -977,59 +979,39 @@
         const piece = gameState.board[row][col];
         if (!piece) return moves;
 
-        const isDame = piece.length > 1;
         const isPlayer = isPlayerPiece(piece);
-
-        const directions = isDame ? 
+        const directions = piece.king ? 
           [[1,1],[1,-1],[-1,1],[-1,-1]] : 
           isPlayer ? [[1,1],[1,-1]] : [[-1,1],[-1,-1]];
 
         // Обычные ходы на одну клетку
         for (let [dr, dc] of directions) {
           const nr = row + dr, nc = col + dc;
-          if (nr >= 0 && nr < 8 && nc >= 0 && nc < 8 && !gameState.board[nr][nc]) {
-            moves.push([nr, nc, false]);
+          if (nr >= 0 && nr < 8 && nc >= 0 && nc < 8) {
+            const target = gameState.board[nr][nc];
+            if (!target) {
+              moves.push({from: {r:row, c:col}, to: {r:nr, c:nc}, captures: []});
+            }
           }
         }
 
-        // Захваты на две клетки
+        // Захваты (обязательные)
+        const captureMoves = [];
         for (let [dr, dc] of directions) {
           const nr = row + dr, nc = col + dc;
           const nr2 = row + 2*dr, nc2 = col + 2*dc;
           
           if (nr >= 0 && nr < 8 && nc >= 0 && nc < 8 && 
-              nr2 >= 0 && nr2 < 8 && nc2 >= 0 && nc2 < 8 &&
-              gameState.board[nr][nc] && 
-              (isPlayer ? isAIPiece(gameState.board[nr][nc]) : isPlayerPiece(gameState.board[nr][nc])) &&
-              !gameState.board[nr2][nc2]) {
-            moves.push([nr2, nc2, true]);
-          }
-        }
-
-        // Для дам - многошаговые ходы
-        if (isDame) {
-          for (let [dr, dc] of [[1,1],[1,-1],[-1,1],[-1,-1]]) {
-            let nr = row + dr, nc = col + dc;
-            while (nr >= 0 && nr < 8 && nc >= 0 && nc < 8) {
-              if (!gameState.board[nr][nc]) {
-                moves.push([nr, nc, false]);
-              } else if ((isPlayer ? isAIPiece(gameState.board[nr][nc]) : isPlayerPiece(gameState.board[nr][nc]))) {
-                // Попытка захвата
-                const nr2 = nr + dr, nc2 = nc + dc;
-                if (nr2 >= 0 && nr2 < 8 && nc2 >= 0 && nc2 < 8 && !gameState.board[nr2][nc2]) {
-                  moves.push([nr2, nc2, true]);
-                }
-                break;
-              } else {
-                break;
-              }
-              nr += dr;
-              nc += dc;
+              nr2 >= 0 && nr2 < 8 && nc2 >= 0 && nc2 < 8) {
+            const enemy = gameState.board[nr][nc];
+            const target = gameState.board[nr2][nc2];
+            if (enemy && (isPlayer ? isAIPiece(enemy) : isPlayerPiece(enemy)) && !target) {
+              captureMoves.push({from: {r:row, c:col}, to: {r:nr2, c:nc2}, captures: [{r:nr, c:nc}]});
             }
           }
         }
 
-        return moves;
+        return captureMoves.length > 0 ? captureMoves : moves;
       }
 
       function evaluatePosition() {
@@ -1038,30 +1020,43 @@
           for (let c = 0; c < 8; c++) {
             const piece = gameState.board[r][c];
             if (piece) {
-              const isPlayer = isPlayerPiece(piece);
-              const isDame = piece.length > 1;
-              const value = isDame ? 5 : 1;
-              const advancement = isPlayer ? r : (7 - r);
-              score += isPlayer ? (value + advancement * 0.1) : -(value + advancement * 0.1);
+              const value = piece.king ? 5 : 1;
+              const advancement = isPlayerPiece(piece) ? r : (7 - r);
+              score += isPlayerPiece(piece) ? (value + advancement * 0.1) : -(value + advancement * 0.1);
             }
           }
         }
         return score;
       }
 
-      function minimax(depth, isMaximizing, alpha, beta) {
-        if (depth === 0) {
-          return evaluatePosition();
+      function applyMove(move) {
+        const b = gameState.board.map(row => row ? row.map(p => p ? {...p} : null) : null);
+        const piece = b[move.from.r][move.from.c];
+        b[move.from.r][move.from.c] = null;
+        b[move.to.r][move.to.c] = piece;
+        
+        if (move.captures && move.captures.length) {
+          move.captures.forEach(c => b[c.r][c.c] = null);
         }
+        
+        // crown
+        if (piece && !piece.king) {
+          if (piece.color === 'w' && move.to.r === 7) piece.king = true;
+          if (piece.color === 'b' && move.to.r === 0) piece.king = true;
+        }
+        
+        return b;
+      }
 
+      function minimax(depth, isMaximizing, alpha, beta) {
+        if (depth === 0) return evaluatePosition();
+        
         let moves = [];
         for (let r = 0; r < 8; r++) {
           for (let c = 0; c < 8; c++) {
             if (isMaximizing ? isAIPiece(gameState.board[r][c]) : isPlayerPiece(gameState.board[r][c])) {
               const pieceMoves = getValidMoves(r, c);
-              for (let [nr, nc, isCapture] of pieceMoves) {
-                moves.push([r, c, nr, nc, isCapture]);
-              }
+              moves.push(...pieceMoves);
             }
           }
         }
@@ -1070,18 +1065,12 @@
 
         if (isMaximizing) {
           let maxEval = -Infinity;
-          for (let [r, c, nr, nc, isCapture] of moves) {
-            const captured = gameState.board[nr][nc];
-            const capturedPiece = isCapture ? gameState.board[Math.floor((r+nr)/2)][Math.floor((c+nc)/2)] : null;
-            gameState.board[nr][nc] = gameState.board[r][c];
-            gameState.board[r][c] = null;
-            if (isCapture) gameState.board[Math.floor((r+nr)/2)][Math.floor((c+nc)/2)] = null;
-
+          for (let m of moves) {
+            const oldBoard = gameState.board;
+            gameState.board = applyMove(m);
             const eval_ = minimax(depth - 1, false, alpha, beta);
-            gameState.board[r][c] = gameState.board[nr][nc];
-            gameState.board[nr][nc] = captured;
-            if (isCapture) gameState.board[Math.floor((r+nr)/2)][Math.floor((c+nc)/2)] = capturedPiece;
-
+            gameState.board = oldBoard;
+            
             maxEval = Math.max(maxEval, eval_);
             alpha = Math.max(alpha, eval_);
             if (beta <= alpha) break;
@@ -1089,18 +1078,12 @@
           return maxEval;
         } else {
           let minEval = Infinity;
-          for (let [r, c, nr, nc, isCapture] of moves) {
-            const captured = gameState.board[nr][nc];
-            const capturedPiece = isCapture ? gameState.board[Math.floor((r+nr)/2)][Math.floor((c+nc)/2)] : null;
-            gameState.board[nr][nc] = gameState.board[r][c];
-            gameState.board[r][c] = null;
-            if (isCapture) gameState.board[Math.floor((r+nr)/2)][Math.floor((c+nc)/2)] = null;
-
+          for (let m of moves) {
+            const oldBoard = gameState.board;
+            gameState.board = applyMove(m);
             const eval_ = minimax(depth - 1, true, alpha, beta);
-            gameState.board[r][c] = gameState.board[nr][nc];
-            gameState.board[nr][nc] = captured;
-            if (isCapture) gameState.board[Math.floor((r+nr)/2)][Math.floor((c+nc)/2)] = capturedPiece;
-
+            gameState.board = oldBoard;
+            
             minEval = Math.min(minEval, eval_);
             beta = Math.min(beta, eval_);
             if (beta <= alpha) break;
@@ -1115,9 +1098,7 @@
           for (let c = 0; c < 8; c++) {
             if (isAIPiece(gameState.board[r][c])) {
               const pieceMoves = getValidMoves(r, c);
-              for (let [nr, nc, isCapture] of pieceMoves) {
-                moves.push([r, c, nr, nc, isCapture]);
-              }
+              moves.push(...pieceMoves);
             }
           }
         }
@@ -1133,31 +1114,25 @@
           return moves[Math.floor(Math.random() * moves.length)];
         }
 
-        const captureMoves = moves.filter(m => m[4]);
+        // Приоритет захватам
+        const captureMoves = moves.filter(m => m.captures && m.captures.length > 0);
         const priorityMoves = captureMoves.length > 0 ? captureMoves : moves;
 
         let bestScore = -Infinity;
         let bestMoves = [];
 
-        for (let [r, c, nr, nc, isCapture] of priorityMoves) {
-          const captured = gameState.board[nr][nc];
-          const capturedPiece = isCapture ? gameState.board[Math.floor((r+nr)/2)][Math.floor((c+nc)/2)] : null;
-          gameState.board[nr][nc] = gameState.board[r][c];
-          gameState.board[r][c] = null;
-          if (isCapture) gameState.board[Math.floor((r+nr)/2)][Math.floor((c+nc)/2)] = null;
-
+        for (let m of priorityMoves) {
+          const oldBoard = gameState.board;
+          gameState.board = applyMove(m);
           const depth = difficulty === 'medium' ? 3 : 5;
           const score = minimax(depth, false, -Infinity, Infinity);
-
-          gameState.board[r][c] = gameState.board[nr][nc];
-          gameState.board[nr][nc] = captured;
-          if (isCapture) gameState.board[Math.floor((r+nr)/2)][Math.floor((c+nc)/2)] = capturedPiece;
+          gameState.board = oldBoard;
 
           if (score > bestScore) {
             bestScore = score;
-            bestMoves = [[r, c, nr, nc, isCapture]];
+            bestMoves = [m];
           } else if (score === bestScore) {
-            bestMoves.push([r, c, nr, nc, isCapture]);
+            bestMoves.push(m);
           }
         }
 
@@ -1178,7 +1153,11 @@
             cell.style.cursor = 'pointer';
             cell.style.fontSize = '24px';
             cell.style.transition = 'all 0.2s';
-            cell.textContent = gameState.board[row][col] || '';
+            
+            const piece = gameState.board[row][col];
+            if (piece) {
+              cell.textContent = piece.color === 'w' ? (piece.king ? '⚪♕' : '⚪') : (piece.king ? '⚫♕' : '⚫');
+            }
 
             if (gameState.selectedRow === row && gameState.selectedCol === col) {
               cell.style.background = '#FFD700';
@@ -1203,23 +1182,20 @@
           }
         } else {
           const moves = getValidMoves(gameState.selectedRow, gameState.selectedCol);
-          const moveData = moves.find(m => m[0] === row && m[1] === col);
+          const moveData = moves.find(m => m.to.r === row && m.to.c === col);
 
           if (moveData) {
-            const [nr, nc, isCapture] = moveData;
             gameState.board[row][col] = gameState.board[gameState.selectedRow][gameState.selectedCol];
             gameState.board[gameState.selectedRow][gameState.selectedCol] = null;
 
-            if (isCapture) {
-              const captureRow = Math.floor((gameState.selectedRow + row) / 2);
-              const captureCol = Math.floor((gameState.selectedCol + col) / 2);
-              gameState.board[captureRow][captureCol] = null;
+            if (moveData.captures && moveData.captures.length) {
+              moveData.captures.forEach(c => gameState.board[c.r][c.c] = null);
             }
 
             // Превращение в дамку
-            if ((isPlayerPiece(gameState.board[row][col]) && row === 7) ||
-                (isAIPiece(gameState.board[row][col]) && row === 0)) {
-              gameState.board[row][col] += '♕';
+            if (gameState.board[row][col] && !gameState.board[row][col].king) {
+              if (gameState.board[row][col].color === 'w' && row === 7) gameState.board[row][col].king = true;
+              if (gameState.board[row][col].color === 'b' && row === 0) gameState.board[row][col].king = true;
             }
 
             gameState.selectedRow = null;
@@ -1231,20 +1207,18 @@
             setTimeout(() => {
               const move = getAIMove();
               if (move) {
-                const [r, c, nr, nc, isCapture] = move;
-                gameState.board[nr][nc] = gameState.board[r][c];
-                gameState.board[r][c] = null;
+                gameState.board[move.to.r][move.to.c] = gameState.board[move.from.r][move.from.c];
+                gameState.board[move.from.r][move.from.c] = null;
 
-                if (isCapture) {
-                  const captureRow = Math.floor((r + nr) / 2);
-                  const captureCol = Math.floor((c + nc) / 2);
-                  gameState.board[captureRow][captureCol] = null;
+                if (move.captures && move.captures.length) {
+                  move.captures.forEach(c => gameState.board[c.r][c.c] = null);
                 }
 
                 // Превращение в дамку
-                if ((isPlayerPiece(gameState.board[nr][nc]) && nr === 7) ||
-                    (isAIPiece(gameState.board[nr][nc]) && nr === 0)) {
-                  gameState.board[nr][nc] += '♕';
+                if (gameState.board[move.to.r][move.to.c] && !gameState.board[move.to.r][move.to.c].king) {
+                  if (gameState.board[move.to.r][move.to.c].color === 'b' && move.to.r === 0) {
+                    gameState.board[move.to.r][move.to.c].king = true;
+                  }
                 }
 
                 const playerHasPieces = gameState.board.some(row => 
